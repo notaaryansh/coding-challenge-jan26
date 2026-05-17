@@ -261,7 +261,7 @@ async function cascadeClean(excludeMatchId, idsToRemove) {
   const remove = new Set(idsToRemove);
   const [rows] = await db.query(
     `SELECT * FROM match WHERE progress = "in_progress" AND id != $excluded`,
-    { excluded: new StringRecordId(excludeMatchId.replace(/^match:/, "")) },
+    { excluded: new StringRecordId(excludeMatchId) },
   );
   for (const row of rows ?? []) {
     const trace = row.filter_trace;
@@ -283,7 +283,7 @@ async function cascadeClean(excludeMatchId, idsToRemove) {
     }
     trace.final_candidates = scrub(trace.final_candidates);
     if (dirty) {
-      await db.merge(new StringRecordId(String(row.id).replace(/^match:/, "")), {
+      await db.merge(new StringRecordId(String(row.id)), {
         filter_trace: trace,
       });
     }
