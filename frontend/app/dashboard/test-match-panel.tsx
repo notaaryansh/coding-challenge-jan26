@@ -1,66 +1,27 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type {
-  FilterTrace,
-  Fruit,
-  ParallelStage,
-  ShineFactor,
-} from "@/lib/matching";
+import type { Fruit, ParallelStage, ShineFactor } from "@/lib/matching";
 import { FruitCard } from "@/components/fruit-card";
 import { FruitChip } from "@/components/fruit-chip";
 import { MatchExplanation } from "@/components/match-explanation";
 import { MutualAcceptanceDetail } from "@/components/mutual-acceptance-detail";
 import { SlideDeck, type Slide } from "@/components/slide-deck";
 import { useVisualization, type LiveResult } from "@/lib/visualization-store";
-
-interface TestResponse {
-  source: Fruit;
-  pool_type: "apple" | "orange";
-  pool_size: number;
-  pool: Fruit[];
-  trace: FilterTrace;
-}
+import { NewConversationControl } from "./new-conversation-control";
+import type { FilterTrace } from "@/lib/matching";
 
 export function TestMatchPanel() {
   const current = useVisualization((s) => s.current);
   const activeIndex = useVisualization((s) => s.activeIndex);
-  const setResult = useVisualization((s) => s.setResult);
   const setActiveIndex = useVisualization((s) => s.setActiveIndex);
   const clear = useVisualization((s) => s.clear);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const fruitById = useMemo(() => {
     const map = new Map<string, Fruit>();
     if (current) for (const f of current.pool) map.set(f.id, f);
     return map;
   }, [current]);
-
-  const runTest = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/test-match", { method: "POST" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const body = (await res.json()) as TestResponse;
-      setResult({
-        kind: "test",
-        source: body.source,
-        pool: body.pool,
-        pool_type: body.pool_type,
-        trace: body.trace,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const slides: Slide[] = useMemo(() => {
     if (!current) return [];
@@ -165,9 +126,8 @@ export function TestMatchPanel() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm text-muted">
-          {current?.kind === "live"
-            ? "Showing the live match flow for the most recent New Conversation. Use the tabs or ← / → to step through the pipeline."
-            : "Picks a random apple, runs it through the matching pipeline, and walks you through each stage. Use the tabs or ← / → to step through."}
+          Pick a fruit type and start a New Conversation to run the full
+          matching pipeline. Use the tabs or ← / → to step through each stage.
         </p>
         <div className="flex items-center gap-2 shrink-0">
           {current && (
@@ -179,28 +139,14 @@ export function TestMatchPanel() {
               Clear
             </button>
           )}
-          <button
-            type="button"
-            onClick={runTest}
-            disabled={loading}
-            className="btn-primary disabled:opacity-50"
-          >
-            {loading ? "Running..." : "Test"}
-          </button>
+          <NewConversationControl />
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/20 dark:text-red-400">
-          {error}
-        </div>
-      )}
-
-      {!current && !error && (
+      {!current && (
         <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-12 text-center text-sm text-muted dark:border-zinc-700 dark:bg-zinc-900/40">
-          No visualization yet. Click <strong>Test</strong> to dry-run a match,
-          or click <strong>New Conversation</strong> in the header to run the
-          full pipeline.
+          No visualization yet. Pick a fruit type and click{" "}
+          <strong>New Conversation</strong> above to run a match.
         </div>
       )}
 
@@ -633,36 +579,34 @@ function ResultBlock({
   fruitById: Map<string, Fruit>;
 }) {
   if (trace.selected) {
-    const selectedFruit = fruitById.get(trace.selected);
-    const otherFinalists = trace.final_candidates.filter(
-      (id) => id !== trace.selected,
-    );
+    // Render every finalist in the same column, same size, same width — only
+    // the selected one gets the green outline so the winner is unambiguous.
+    const finalists = trace.final_candidates;
     return (
-      <div className="space-y-3 rounded-lg border-2 border-emerald-400 bg-emerald-50/30 p-4 dark:border-emerald-700 dark:bg-emerald-950/15">
+      <div className="space-y-3">
         <div>
           <div className="text-sm font-semibold">✓ Match selected</div>
           <div className="mt-0.5 text-xs text-muted">
-            FIFO winner from {trace.final_candidates.length} final candidate
-            {trace.final_candidates.length === 1 ? "" : "s"}
+            FIFO winner from {finalists.length} final candidate
+            {finalists.length === 1 ? "" : "s"} — the green-outlined card is the
+            one that was picked.
           </div>
         </div>
-        {selectedFruit && (
-          <FruitCard fruit={selectedFruit} size="md" highlighted />
-        )}
-        {otherFinalists.length > 0 && (
-          <div>
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
-              Other finalists
-            </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {otherFinalists.map((id) => {
-                const fruit = fruitById.get(id);
-                if (!fruit) return null;
-                return <FruitCard key={id} fruit={fruit} size="sm" />;
-              })}
-            </div>
-          </div>
-        )}
+        <div className="flex flex-col gap-3">
+          {finalists.map((id) => {
+            const fruit = fruitById.get(id);
+            if (!fruit) return null;
+            const isSelected = id === trace.selected;
+            return (
+              <FruitCard
+                key={id}
+                fruit={fruit}
+                size="md"
+                highlighted={isSelected}
+              />
+            );
+          })}
+        </div>
       </div>
     );
   }

@@ -1,4 +1,7 @@
 import { NavTabs } from "@/components/nav-tabs";
+import { InitOverlay } from "@/components/init-overlay";
+import { StartButton } from "@/components/start-button";
+import { getInitStatus } from "@/lib/init-status";
 import { PopularityLeaderboards } from "./leaderboards";
 import { getAdminData } from "./loader";
 import { MatchRowCard } from "./match-row";
@@ -7,10 +10,14 @@ import { NearMissHistogram } from "./near-miss-histogram";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const data = await getAdminData();
+  const [data, initStatus] = await Promise.all([
+    getAdminData(),
+    getInitStatus(),
+  ]);
 
   return (
     <div className="min-h-screen">
+      <InitOverlay status={initStatus} />
       <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80">
         <div className="mx-auto max-w-7xl px-6 py-6">
           <div className="flex items-center justify-between">
@@ -22,7 +29,10 @@ export default async function AdminPage() {
                 Every match row in the DB, with its stored filter_trace.
               </p>
             </div>
-            <NavTabs />
+            <div className="flex items-center gap-4">
+              <StartButton />
+              <NavTabs />
+            </div>
           </div>
         </div>
       </header>
@@ -58,11 +68,11 @@ export default async function AdminPage() {
         </section>
 
         <section>
-          <NearMissHistogram data={data.nearMiss} />
+          <PopularityLeaderboards data={data.leaderboards} />
         </section>
 
         <section>
-          <PopularityLeaderboards data={data.leaderboards} />
+          <NearMissHistogram data={data.nearMiss} />
         </section>
 
         <section>

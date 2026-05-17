@@ -482,12 +482,6 @@ function MissingChip({ id }: { id: string }) {
   );
 }
 
-function Divider() {
-  return (
-    <div className="ml-4 h-2 border-l-2 border-dashed border-zinc-300 dark:border-zinc-700" />
-  );
-}
-
 function formatStageTitle(stage: ParallelStage): string {
   const { field, operation, criteria } = stage;
   if (operation === "range") {

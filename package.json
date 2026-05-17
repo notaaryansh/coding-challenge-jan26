@@ -8,6 +8,7 @@
     "db:stop": "docker compose down",
     "db:reset": "docker compose down -v && docker compose up -d surrealdb && sleep 2 && pnpm db:seed",
     "db:seed": "node scripts/seed.mjs",
+    "simulate": "node scripts/simulate.mjs",
     "setup": "pnpm db:start && sleep 2 && pnpm db:seed",
     "supabase": "supabase",
     "supabase:start": "supabase start",

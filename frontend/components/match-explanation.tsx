@@ -124,23 +124,33 @@ export function MatchExplanation({
 function PairDiagram({
   source,
   match,
+  matched,
 }: {
   source: Fruit;
   match: Fruit | null;
   matched: boolean;
 }) {
+  // Equal width via grid-cols-2; equal height via items-stretch + h-full on
+  // each card. Both cards get the `highlighted` (green) outline when matched,
+  // because they really are a pair.
   return (
     <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
-      <div className="min-w-0">
-        <FruitCard fruit={source} size="sm" />
-      </div>
-      <div className="min-w-0">
-        {match ? (
-          <FruitCard fruit={match} size="sm" highlighted />
-        ) : (
-          <EmptyPartner />
-        )}
-      </div>
+      <FruitCard
+        fruit={source}
+        size="sm"
+        highlighted={matched}
+        className="h-full min-w-0"
+      />
+      {match ? (
+        <FruitCard
+          fruit={match}
+          size="sm"
+          highlighted
+          className="h-full min-w-0"
+        />
+      ) : (
+        <EmptyPartner />
+      )}
     </div>
   );
 }

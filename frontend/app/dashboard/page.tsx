@@ -1,8 +1,12 @@
 import { Suspense } from "react";
 import { NavTabs } from "@/components/nav-tabs";
+import { InitOverlay } from "@/components/init-overlay";
+import { StartButton } from "@/components/start-button";
+import { getInitStatus } from "@/lib/init-status";
 import { getDashboardData } from "./loader";
-import { NewConversationControl } from "./new-conversation-control";
 import { TestMatchPanel } from "./test-match-panel";
+
+export const dynamic = "force-dynamic";
 
 // =============================================================================
 // ⚠️  DISCLAIMER
@@ -129,9 +133,11 @@ function DashboardSkeleton() {
 // PAGE
 // =============================================================================
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const initStatus = await getInitStatus();
   return (
     <div className="min-h-screen">
+      <InitOverlay status={initStatus} />
       {/* Header - Feel free to redesign! */}
       <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80">
         <div className="mx-auto max-w-7xl px-6 py-6">
@@ -145,7 +151,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <NewConversationControl />
+              <StartButton />
               <NavTabs />
             </div>
           </div>

@@ -44,7 +44,7 @@ function describeUnlock(pair: NearMissPair): React.ReactNode {
 }
 
 export function NearMissHistogram({ data }: Props) {
-  const [expanded, setExpanded] = useState<string | null>("1");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedPair, setSelectedPair] = useState<NearMissPair | null>(null);
   const max = Math.max(...data.buckets.map((b) => b.count), 1);
   const oneAway = data.buckets.find((b) => b.key === "1")?.count ?? 0;
@@ -107,11 +107,13 @@ export function NearMissHistogram({ data }: Props) {
               </button>
 
               {isExpanded && bucket.pairs.length > 0 && (
-                <div className="ml-32 mt-2 mb-4 space-y-2 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+                <div className="ml-32 mt-2 mb-4 space-y-1 border-l border-zinc-200 pl-4 dark:border-zinc-800">
                   {bucket.pairs.map((pair, i) => (
-                    <div
+                    <button
+                      type="button"
                       key={`${pair.apple.id}-${pair.orange.id}-${i}`}
-                      className="flex flex-wrap items-center gap-2 text-xs"
+                      onClick={() => setSelectedPair(pair)}
+                      className="flex w-full flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
                     >
                       <FruitChip fruit={pair.apple} size="compact" />
                       <span className="text-zinc-400">↔</span>
@@ -120,7 +122,10 @@ export function NearMissHistogram({ data }: Props) {
                       <span className="flex flex-wrap items-center gap-1">
                         {describeUnlock(pair)}
                       </span>
-                    </div>
+                      <span className="ml-auto text-[10px] text-zinc-400">
+                        details →
+                      </span>
+                    </button>
                   ))}
                   {bucket.count > bucket.pairs.length && (
                     <div className="pt-1 text-xs italic text-zinc-400">
@@ -134,5 +139,12 @@ export function NearMissHistogram({ data }: Props) {
         })}
       </div>
     </div>
+    {selectedPair && (
+      <PairDetailModal
+        pair={selectedPair}
+        onClose={() => setSelectedPair(null)}
+      />
+    )}
+    </>
   );
 }

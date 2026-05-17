@@ -121,7 +121,7 @@ function PreferencesView({ prefs }: { prefs: FruitPreferences }) {
         <Wish>{prefs.hasLeaf ? "With leaf" : "No leaf"}</Wish>
       )}
       {prefs.hasWorm !== undefined && (
-        <Wish important={!prefs.hasWorm}>
+        <Wish>
           {prefs.hasWorm ? "Doesn't mind a worm" : "No worms"}
         </Wish>
       )}
@@ -165,25 +165,11 @@ function Pill({
   );
 }
 
-function Wish({
-  children,
-  important,
-}: {
-  children: React.ReactNode;
-  important?: boolean;
-}) {
+function Wish({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-1.5 text-sm">
-      <span
-        className={
-          important
-            ? "text-rose-500 dark:text-rose-400"
-            : "text-zinc-400 dark:text-zinc-600"
-        }
-      >
-        ›
-      </span>
-      <span className={important ? "font-medium" : ""}>{children}</span>
+      <span className="text-zinc-400 dark:text-zinc-600">›</span>
+      <span>{children}</span>
     </li>
   );
 }
