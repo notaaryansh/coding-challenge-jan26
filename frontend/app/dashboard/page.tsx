@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getDashboardData } from "./loader";
+import { NewConversationControl } from "./new-conversation-control";
 
 // =============================================================================
 // ⚠️  DISCLAIMER
@@ -155,7 +156,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <button className="btn-primary">New Conversation</button>
+              <NewConversationControl />
             </div>
           </div>
         </div>
