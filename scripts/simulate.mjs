@@ -47,15 +47,11 @@ async function main() {
   );
 
   // ---------------------------------------------------------------------------
-  // Full reset — wipe matches AND fruits, then re-seed from data.json
+  // Full reset — wipe matches AND fruits, re-seed from data.json
   // ---------------------------------------------------------------------------
   console.log("→ wiping match + fruit tables");
   await db.query(`DELETE match`);
   await db.query(`DELETE fruit`);
-
-  console.log("→ applying schema (idempotent)");
-  const schema = await readFile(SCHEMA_PATH, "utf8");
-  await db.query(schema);
 
   console.log("→ seeding fruits from data.json");
   const rawSeed = await readFile(SEED_PATH, "utf8");
