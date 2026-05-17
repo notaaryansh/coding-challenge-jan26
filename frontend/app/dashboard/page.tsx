@@ -34,7 +34,7 @@ async function DashboardContent() {
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      {/* 
+      {/*
         ⚠️ EXAMPLE METRICS - Replace with your own!
         Think about what metrics actually demonstrate your system is working well.
         These are just placeholders to show the pattern.

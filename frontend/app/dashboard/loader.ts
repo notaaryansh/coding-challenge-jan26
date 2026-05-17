@@ -1,3 +1,4 @@
+import { getDb } from "@/lib/db";
 import type { MatchMetrics } from "./page";
 
 // =============================================================================
@@ -28,14 +29,19 @@ export interface DashboardData {
  * - Access server-only resources
  */
 export async function getDashboardData(): Promise<DashboardData> {
-  // Simulate network delay for loading state demo
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  const db = await getDb();
+
+  const [apples, oranges] = await db.query<
+    [Array<{ count: number }>, Array<{ count: number }>]
+  >(`
+    SELECT count() FROM fruit WHERE type = "apple" GROUP ALL;
+    SELECT count() FROM fruit WHERE type = "orange" GROUP ALL;
+  `);
 
   // TODO: Replace with actual SurrealDB or supabase queries
-
   const metrics: MatchMetrics = {
-    totalApples: 0,
-    totalOranges: 0,
+    totalApples: apples[0]?.count ?? 0,
+    totalOranges: oranges[0]?.count ?? 0,
     totalMatches: 0,
     successRate: 0,
   };
