@@ -1,5 +1,33 @@
 # Coding Challenge - Matchmaking System
 
+> **Submission by Aaryansh Sahay.** Full design notes live in **[`polished_writeup.md`](./polished_writeup.md)** — start there for the architecture, matching algorithm, persistence model, visualization, and LLM grounding.
+
+## Quick start
+
+```bash
+# 1. SurrealDB
+docker compose up -d
+
+# 2. Install + seed
+pnpm install
+node scripts/seed.mjs   # loads data/raw_apples_and_oranges.json
+
+# 3. Frontend
+cd frontend
+cp .env.example .env.local        # then add your OPENAI_API_KEY
+pnpm dev                          # http://localhost:3000/dashboard
+
+# 4. Edge functions (separate terminal)
+cp supabase/functions/.env.example supabase/functions/.env
+npx supabase functions serve --no-verify-jwt --env-file supabase/functions/.env
+```
+
+The dashboard is at `/dashboard` (Test button + slide-deck visualization of the match pipeline) and the admin view is at `/admin` (recent matches, leaderboards, near-miss histogram). The "Why" slide on the dashboard explains each match in plain language via OpenAI — set `OPENAI_API_KEY` in `frontend/.env.local` to enable it.
+
+---
+
+## Original challenge prompt
+
 ## Introduction
 
 Hey! Welcome to our little take home challenge. We won't force Leetcode problems down your throat. Instead, what we do here at Clera is build, so therefore, we expect you to build cool stuff too!
