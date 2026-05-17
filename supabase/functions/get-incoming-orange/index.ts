@@ -46,13 +46,17 @@ Deno.serve(async (req) => {
       JSON.stringify({
         message: "Orange received",
         id: result.fruit.id,
+        fruit: result.fruit,
         attributes: orangeAttrs,
         preferences: orangePrefs,
         match: {
           id: result.match_id,
           progress: result.progress,
           partner_id: result.partner?.id ?? null,
+          partner: result.partner,
         },
+        pool: result.pool,
+        pool_type: result.pool_type,
         trace: result.trace,
       }),
       {

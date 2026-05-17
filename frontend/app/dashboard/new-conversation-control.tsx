@@ -2,14 +2,33 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { FilterTrace, Fruit } from "@/lib/matching";
+import { useVisualization } from "@/lib/visualization-store";
 
 const FUNCTIONS_URL = "http://127.0.0.1:54321/functions/v1";
+
+interface EdgeResponse {
+  id: string;
+  fruit: Fruit;
+  attributes: string;
+  preferences: string;
+  match: {
+    id: string;
+    progress: "matched" | "in_progress";
+    partner_id: string | null;
+    partner: Fruit | null;
+  };
+  pool: Fruit[];
+  pool_type: "apple" | "orange";
+  trace: FilterTrace;
+}
 
 export function NewConversationControl() {
   const [fruitType, setFruitType] = useState<"apple" | "orange">("apple");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const setResult = useVisualization((s) => s.setResult);
 
   const handleSubmit = async () => {
     setError(null);
@@ -18,6 +37,23 @@ export function NewConversationControl() {
         method: "POST",
       });
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const body = (await res.json()) as EdgeResponse;
+      setResult({
+        kind: "live",
+        source: body.fruit,
+        pool: body.pool,
+        pool_type: body.pool_type,
+        trace: body.trace,
+        prompt: {
+          attributes: body.attributes,
+          preferences: body.preferences,
+        },
+        match: {
+          id: body.match.id,
+          progress: body.match.progress,
+          partner: body.match.partner,
+        },
+      });
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");

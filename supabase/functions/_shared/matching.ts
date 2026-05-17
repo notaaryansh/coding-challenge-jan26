@@ -1,5 +1,5 @@
 // Deno-compatible mirror of frontend/lib/matching.ts.
-// Keep in sync manually; this is the price for not having a shared monorepo package yet.
+// Keep in sync manually.
 
 export type ShineFactor = "dull" | "neutral" | "shiny" | "extraShiny";
 
@@ -35,20 +35,25 @@ export interface Fruit {
   preferences: FruitPreferences;
 }
 
-export type FilterOp = "equals" | "in" | "range" | "reverse";
+export type FilterOp = "equals" | "in" | "range";
 
-export interface FilterStage {
+export interface ParallelStage {
   field: string;
   operation: FilterOp;
   criteria: unknown;
-  input_count: number;
-  passing_count: number;
+  passing_ids: string[];
+}
+
+export interface ReverseStage {
+  input_ids: string[];
   passing_ids: string[];
 }
 
 export interface FilterTrace {
   initial_pool_size: number;
-  stages: FilterStage[];
+  parallel_stages: ParallelStage[];
+  intersection: string[];
+  reverse: ReverseStage;
   final_candidates: string[];
   selected: string | null;
 }
@@ -84,45 +89,45 @@ function operationFor(field: string, criteria: unknown): FilterOp {
 }
 
 export function runMatching(source: Fruit, pool: Fruit[]): FilterTrace {
-  const stages: FilterStage[] = [];
-  let candidates = pool;
-
+  const parallel_stages: ParallelStage[] = [];
   for (const [field, criteria] of Object.entries(source.preferences ?? {})) {
     if (criteria === undefined) continue;
-    const inputCount = candidates.length;
-    const passing = candidates.filter((c) =>
+    const passing = pool.filter((c) =>
       attrMatches(c.attributes, field, criteria)
     );
-    stages.push({
+    parallel_stages.push({
       field,
       operation: operationFor(field, criteria),
       criteria,
-      input_count: inputCount,
-      passing_count: passing.length,
       passing_ids: passing.map((c) => c.id),
     });
-    candidates = passing;
   }
 
-  const reverseInput = candidates.length;
-  const reverseCompat = candidates.filter((c) =>
+  let intersection: Fruit[];
+  if (parallel_stages.length === 0) {
+    intersection = [...pool];
+  } else {
+    const passingSets = parallel_stages.map((s) => new Set(s.passing_ids));
+    intersection = pool.filter((c) =>
+      passingSets.every((set) => set.has(c.id))
+    );
+  }
+
+  const reversePassing = intersection.filter((c) =>
     Object.entries(c.preferences ?? {}).every(([f, cr]) =>
       cr === undefined ? true : attrMatches(source.attributes, f, cr)
     )
   );
-  stages.push({
-    field: "reverse_compat",
-    operation: "reverse",
-    criteria: "candidate's preferences must accept the source",
-    input_count: reverseInput,
-    passing_count: reverseCompat.length,
-    passing_ids: reverseCompat.map((c) => c.id),
-  });
 
   return {
     initial_pool_size: pool.length,
-    stages,
-    final_candidates: reverseCompat.map((c) => c.id),
-    selected: reverseCompat[0]?.id ?? null,
+    parallel_stages,
+    intersection: intersection.map((c) => c.id),
+    reverse: {
+      input_ids: intersection.map((c) => c.id),
+      passing_ids: reversePassing.map((c) => c.id),
+    },
+    final_candidates: reversePassing.map((c) => c.id),
+    selected: reversePassing[0]?.id ?? null,
   };
 }

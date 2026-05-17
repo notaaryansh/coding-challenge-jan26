@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { NavTabs } from "@/components/nav-tabs";
 import { getDashboardData } from "./loader";
 import { NewConversationControl } from "./new-conversation-control";
 import { TestMatchPanel } from "./test-match-panel";
@@ -124,19 +125,6 @@ function DashboardSkeleton() {
   );
 }
 
-/**
- * A helper component to display scaffold notes in the UI.
- * Remove this component entirely when building your solution!
- */
-function ScaffoldNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-4 rounded-lg border border-dashed border-amber-400/50 bg-amber-50/50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-400">
-      <span className="mr-2">💡</span>
-      {children}
-    </div>
-  );
-}
-
 // =============================================================================
 // PAGE
 // =============================================================================
@@ -158,6 +146,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-4">
               <NewConversationControl />
+              <NavTabs />
             </div>
           </div>
         </div>
@@ -168,11 +157,6 @@ export default function DashboardPage() {
         {/* Metrics Section */}
         <section className="mb-8">
           <h2 className="mb-4 text-lg font-semibold">Overview Metrics</h2>
-          <ScaffoldNote>
-            <strong>This entire section is just an example!</strong> Think about
-            what metrics actually prove your matchmaking system works well.
-            Quality over quantity - pick metrics that tell a compelling story.
-          </ScaffoldNote>
           <Suspense fallback={<DashboardSkeleton />}>
             <DashboardContent />
           </Suspense>
@@ -183,105 +167,11 @@ export default function DashboardPage() {
           <h2 className="mb-4 text-lg font-semibold">
             Matchmaking Visualization
           </h2>
-          <ScaffoldNote>
-            <strong>Build whatever visualization makes sense for your solution!</strong>{" "}
-            This could be a chat interface, a network graph, a timeline, an
-            animation - get creative and show off your approach.
-          </ScaffoldNote>
           <div className="card min-h-[400px]">
             <TestMatchPanel />
           </div>
         </section>
 
-        {/* Recent Matches Section */}
-        <section className="mb-8">
-          <h2 className="mb-4 text-lg font-semibold">Recent Matches</h2>
-          <ScaffoldNote>
-            <strong>A table might not be the best way to show matches.</strong>{" "}
-            Consider cards, a feed, or something more visual. You decide what
-            data to show and how to present it.
-          </ScaffoldNote>
-          <div className="card">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">
-                      Apple
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">
-                      Orange
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">
-                      Match Score
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">
-                      Created At
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-8 text-center text-sm text-muted"
-                    >
-                      No matches yet. Start a new conversation to create your
-                      first pear! 🍐
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        {/* Analytics Section */}
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Analytics</h2>
-          <ScaffoldNote>
-            <strong>
-              These chart placeholders are arbitrary examples - don&apos;t feel bound
-              to them!
-            </strong>{" "}
-            Design analytics that demonstrate YOUR system&apos;s performance. What
-            metrics convince YOU that the matchmaking is working well?
-          </ScaffoldNote>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="card min-h-[300px]">
-              <h3 className="mb-4 font-medium text-muted">
-                Example: Match Quality Distribution
-              </h3>
-              <div className="flex h-full items-center justify-center text-muted">
-                <p className="text-sm">
-                  Replace with your own analytics component
-                </p>
-              </div>
-            </div>
-            <div className="card min-h-[300px]">
-              <h3 className="mb-4 font-medium text-muted">
-                Example: Matches Over Time
-              </h3>
-              <div className="flex h-full items-center justify-center text-muted">
-                <p className="text-sm">
-                  Replace with your own analytics component
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Footer Note */}
-        <footer className="mt-12 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-4 text-center text-sm text-muted dark:border-zinc-700 dark:bg-zinc-900">
-          <p className="font-medium">🚀 This entire dashboard is just scaffolding!</p>
-          <p className="mt-1">
-            Feel free to completely redesign, restructure, or rebuild from
-            scratch.
-          </p>
-        </footer>
       </main>
     </div>
   );

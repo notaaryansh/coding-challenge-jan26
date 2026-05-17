@@ -12,6 +12,9 @@ export interface PersistResult {
   progress: "in_progress" | "matched";
   partner: Fruit | null;
   trace: FilterTrace;
+  /** The opposite-type pool the matcher ran against, in FIFO order. */
+  pool: Fruit[];
+  pool_type: "apple" | "orange";
 }
 
 type RawFruit = Omit<Fruit, "id"> & { id?: unknown };
@@ -96,9 +99,17 @@ export async function persistAndMatch(
       winnerFruit: orderedPool.find((f) => f.id === trace.selected) ?? null,
       existingInProgMatch: inProgByFruitId.get(trace.selected) ?? null,
       trace,
+      pool: orderedPool,
+      poolType: oppositeType,
     });
   }
-  return await createInProgress({ db, newFruit, trace });
+  return await createInProgress({
+    db,
+    newFruit,
+    trace,
+    pool: orderedPool,
+    poolType: oppositeType,
+  });
 }
 
 // =============================================================================
@@ -112,6 +123,8 @@ async function completeMatch({
   winnerFruit,
   existingInProgMatch,
   trace,
+  pool,
+  poolType,
 }: {
   db: Awaited<ReturnType<typeof getDb>>;
   newFruit: Fruit;
@@ -119,6 +132,8 @@ async function completeMatch({
   winnerFruit: Fruit | null;
   existingInProgMatch: Record<string, unknown> | null;
   trace: FilterTrace;
+  pool: Fruit[];
+  poolType: "apple" | "orange";
 }): Promise<PersistResult> {
   const incomingType = newFruit.type;
   const oppositeType = incomingType === "apple" ? "orange" : "apple";
@@ -191,6 +206,8 @@ async function completeMatch({
     progress: "matched",
     partner: winnerFruit,
     trace,
+    pool,
+    pool_type: poolType,
   };
 }
 
@@ -198,10 +215,14 @@ async function createInProgress({
   db,
   newFruit,
   trace,
+  pool,
+  poolType,
 }: {
   db: Awaited<ReturnType<typeof getDb>>;
   newFruit: Fruit;
   trace: FilterTrace;
+  pool: Fruit[];
+  poolType: "apple" | "orange";
 }): Promise<PersistResult> {
   const created = await db.create("match", {
     initiator: newFruit.type,
@@ -216,6 +237,8 @@ async function createInProgress({
     progress: "in_progress",
     partner: null,
     trace,
+    pool,
+    pool_type: poolType,
   };
 }
 
@@ -242,19 +265,26 @@ async function cascadeClean(
     if (!trace) continue;
     let dirty = false;
 
-    for (const stage of trace.stages ?? []) {
-      const before = stage.passing_ids.length;
-      stage.passing_ids = stage.passing_ids.filter((id) => !remove.has(id));
-      if (stage.passing_ids.length !== before) {
-        stage.passing_count = stage.passing_ids.length;
-        dirty = true;
-      }
+    const scrub = (ids: string[] | undefined): string[] => {
+      const arr = ids ?? [];
+      const filtered = arr.filter((id) => !remove.has(id));
+      if (filtered.length !== arr.length) dirty = true;
+      return filtered;
+    };
+
+    // Each parallel stage's passing set
+    for (const stage of trace.parallel_stages ?? []) {
+      stage.passing_ids = scrub(stage.passing_ids);
     }
-    const finalsBefore = trace.final_candidates?.length ?? 0;
-    trace.final_candidates = (trace.final_candidates ?? []).filter(
-      (id) => !remove.has(id),
-    );
-    if ((trace.final_candidates?.length ?? 0) !== finalsBefore) dirty = true;
+    // The intersection
+    trace.intersection = scrub(trace.intersection);
+    // Reverse stage input + passing
+    if (trace.reverse) {
+      trace.reverse.input_ids = scrub(trace.reverse.input_ids);
+      trace.reverse.passing_ids = scrub(trace.reverse.passing_ids);
+    }
+    // Final candidates
+    trace.final_candidates = scrub(trace.final_candidates);
 
     if (dirty) {
       await db.merge(new StringRecordId(String(row.id)), {

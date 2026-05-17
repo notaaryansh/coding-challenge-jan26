@@ -1,19 +1,11 @@
 This file is for documenting my thought process.
 
 
-Match making process:
-- Fruits have physical + aesthetic attributes
-Physical {size, weight, hasChemicals}
-Aesthetic {hasStem, hasLeaf, hasWorm, shineFactor}
-
-The reason I decided to classify hasStem/hasLeaf as aesthetic attributes rather than physical is because the do not influence the physical aspects of a fruit. (There might be a correlation between the two, but ignoring it for the scope of this assignment).
-
 My idea for matchmaking process is as follows:
 - Return candidates pool based on hard preference.
 - Do a set operation.
-- Filter candidate pool by size preference.
 - Check if query's attribute satisfy the candidate pool's preferences.
-- Return top 'n'.
+- Return top '1'.
 - if no match; return "Here'e someone with [x] -- fruit". 
 
 
@@ -98,4 +90,16 @@ UPDATE match
  
 
 
- look into what will happen if cascade fails mid match
+ 
+ 
+ [check] look into what will happen if cascade fails mid match
+
+ [assumption] we are matching the top valid candidate; even if theres 5; we still match the top. 
+
+
+ Also doesn't make sense right now to measure how good a match is based on our setup; because matches will ONLY be made if they satisfy each criteria; with fallback upoto the user. 
+
+ So a better evaluation criteria would be an analysis/ aggregation of number of candidates vs succesfull matches; unsuccesul matches failing etc///degrees of separation etc.. (like heartbreakers/mostwanted/etc...)
+
+
+

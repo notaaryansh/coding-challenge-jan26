@@ -76,7 +76,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function AttributesView({ attrs }: { attrs: FruitAttributes }) {
+export function AttributesView({ attrs }: { attrs: FruitAttributes }) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -91,9 +91,6 @@ function AttributesView({ attrs }: { attrs: FruitAttributes }) {
         {attrs.hasLeaf !== null && <Pill label="Leaf" present={attrs.hasLeaf} />}
         {attrs.hasWorm !== null && (
           <Pill label="Worm" present={attrs.hasWorm} danger />
-        )}
-        {attrs.hasChemicals !== null && (
-          <Pill label="Chemicals" present={attrs.hasChemicals} danger />
         )}
       </div>
     </div>
@@ -126,11 +123,6 @@ function PreferencesView({ prefs }: { prefs: FruitPreferences }) {
       {prefs.hasWorm !== undefined && (
         <Wish important={!prefs.hasWorm}>
           {prefs.hasWorm ? "Doesn't mind a worm" : "No worms"}
-        </Wish>
-      )}
-      {prefs.hasChemicals !== undefined && (
-        <Wish>
-          {prefs.hasChemicals ? "Chemicals fine" : "Organic only"}
         </Wish>
       )}
     </ul>

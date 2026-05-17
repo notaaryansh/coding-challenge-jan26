@@ -1,8 +1,18 @@
-import Surreal from "surrealdb";
+import Surreal, { ConnectionStatus } from "surrealdb";
 
 let cached: Surreal | null = null;
 
 export async function getDb(): Promise<Surreal> {
+  // If the cached client lost its socket (e.g. SurrealDB was restarted),
+  // throw it away and reconnect — otherwise queries hang forever.
+  if (cached && cached.status !== ConnectionStatus.Connected) {
+    try {
+      await cached.close();
+    } catch {
+      // ignore
+    }
+    cached = null;
+  }
   if (cached) return cached;
 
   const db = new Surreal();

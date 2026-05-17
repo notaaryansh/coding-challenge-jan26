@@ -62,7 +62,7 @@ export interface FilterTrace {
   selected: string | null;
 }
 
-function attrMatches(
+export function attrMatches(
   attrs: FruitAttributes,
   field: string,
   criteria: unknown
