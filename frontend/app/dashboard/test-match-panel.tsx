@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { FilterStage, FilterTrace, Fruit } from "@/lib/matching";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  FilterStage,
+  FilterTrace,
+  Fruit,
+  ShineFactor,
+} from "@/lib/matching";
 import { FruitCard } from "@/components/fruit-card";
+import { FruitChip } from "@/components/fruit-chip";
 
 interface TestResponse {
   source: Fruit;
@@ -12,16 +18,35 @@ interface TestResponse {
   trace: FilterTrace;
 }
 
+const STAGE_DELAY_MS = 400;
+
 export function TestMatchPanel() {
   const [data, setData] = useState<TestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Number of pipeline blocks revealed so far. Pool = 1, then each stage, then final.
+  const [revealed, setRevealed] = useState(0);
 
   const fruitById = useMemo(() => {
     const map = new Map<string, Fruit>();
     if (data) for (const f of data.pool) map.set(f.id, f);
     return map;
   }, [data]);
+
+  // Total reveal steps: 1 (pool) + N stages + 1 (final result)
+  const totalSteps = data ? data.trace.stages.length + 2 : 0;
+
+  useEffect(() => {
+    if (!data) return;
+    setRevealed(0);
+    let step = 0;
+    const id = setInterval(() => {
+      step += 1;
+      setRevealed(step);
+      if (step >= totalSteps) clearInterval(id);
+    }, STAGE_DELAY_MS);
+    return () => clearInterval(id);
+  }, [data, totalSteps]);
 
   const run = async () => {
     setLoading(true);
@@ -44,9 +69,9 @@ export function TestMatchPanel() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted">
-          Picks a random apple from the pool and runs the filter pipeline
-          against all oranges. No DB writes — read-only dry run. Click any
-          stage to see the candidates that passed.
+          Picks a random apple from the pool and replays the filter pipeline
+          step by step against all oranges. Click any highlighted fruit to see
+          its card.
         </p>
         <button
           type="button"
@@ -66,127 +91,234 @@ export function TestMatchPanel() {
 
       {data && (
         <div className="space-y-2">
-          <FruitCard fruit={data.source} size="md" />
+          <FadeIn show>
+            <FruitCard fruit={data.source} size="md" />
+          </FadeIn>
+
           <Connector />
-          <StageBox
-            title={`Initial pool: ${data.pool_size} ${data.pool_type}s`}
-            subtitle="Starting candidate set"
-            ids={data.pool.map((p) => p.id)}
-            fruitById={fruitById}
-          />
-          {data.trace.stages.map((stage, i) => (
-            <div key={i}>
-              <Connector />
-              <StageBox
-                title={formatStageTitle(stage)}
-                subtitle={`${stage.passing_count} of ${stage.input_count} passing`}
-                ids={stage.passing_ids}
-                fruitById={fruitById}
-                empty={stage.passing_count === 0}
-              />
-            </div>
-          ))}
+
+          <FadeIn show={revealed >= 1}>
+            <InitialPoolBox pool={data.pool} poolType={data.pool_type} />
+          </FadeIn>
+
+          {data.trace.stages.map((stage, i) => {
+            const stepIndex = i + 2; // pool is step 1, stages start at 2
+            const inputIds =
+              i === 0
+                ? data.pool.map((f) => f.id)
+                : data.trace.stages[i - 1].passing_ids;
+            return (
+              <div key={i}>
+                <Connector />
+                <FadeIn show={revealed >= stepIndex}>
+                  <StageBox
+                    stage={stage}
+                    inputIds={inputIds}
+                    fruitById={fruitById}
+                  />
+                </FadeIn>
+              </div>
+            );
+          })}
+
           <Connector />
-          <ResultBox
-            selected={data.trace.selected}
-            fruitById={fruitById}
-          />
+
+          <FadeIn show={revealed >= totalSteps}>
+            <ResultBlock trace={data.trace} fruitById={fruitById} />
+          </FadeIn>
         </div>
       )}
     </div>
   );
 }
 
-function StageBox({
-  title,
-  subtitle,
-  ids,
-  fruitById,
-  empty,
+// =============================================================================
+// Initial pool — stats only, not expandable
+// =============================================================================
+
+function InitialPoolBox({
+  pool,
+  poolType,
 }: {
-  title: string;
-  subtitle: string;
-  ids: string[];
-  fruitById: Map<string, Fruit>;
-  empty?: boolean;
+  pool: Fruit[];
+  poolType: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const hasFruits = ids.length > 0;
+  const stats = useMemo(() => computePoolStats(pool), [pool]);
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800">
+      <h3 className="text-sm font-semibold">
+        Initial pool: {pool.length} {poolType}s
+      </h3>
+      <dl className="mt-2 space-y-1 text-xs text-muted">
+        <StatRow label="Averages">
+          <span>size {stats.avgSize}</span>
+          <span className="text-zinc-300 dark:text-zinc-700">|</span>
+          <span>weight {stats.avgWeight}g</span>
+        </StatRow>
+        <StatRow label="Shine">
+          {stats.shineBreakdown.map((s, i) => (
+            <span key={s.label} className="flex items-center gap-1">
+              {i > 0 && (
+                <span className="text-zinc-300 dark:text-zinc-700">•</span>
+              )}
+              <span>
+                {s.count} {s.label}
+              </span>
+            </span>
+          ))}
+        </StatRow>
+        <StatRow label="hasWorm = false">
+          <span>{stats.hasWormFalse}</span>
+        </StatRow>
+        <StatRow label="hasChemicals = false">
+          <span>{stats.hasChemicalsFalse}</span>
+        </StatRow>
+      </dl>
+    </div>
+  );
+}
+
+function StatRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+        {label}
+      </dt>
+      <dd className="flex flex-wrap items-center gap-2">{children}</dd>
+    </div>
+  );
+}
+
+// =============================================================================
+// Filter stage box — shows input fruits as chips, highlights survivors
+// =============================================================================
+
+function StageBox({
+  stage,
+  inputIds,
+  fruitById,
+}: {
+  stage: FilterStage;
+  inputIds: string[];
+  fruitById: Map<string, Fruit>;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const passingSet = useMemo(
+    () => new Set(stage.passing_ids),
+    [stage.passing_ids],
+  );
+
+  const isReverse = stage.field === "reverse_compat";
+  const empty = stage.passing_count === 0;
+  const selected = selectedId ? fruitById.get(selectedId) : null;
 
   return (
     <div
-      className={`overflow-hidden rounded-lg border ${
+      className={`rounded-lg border ${
         empty
           ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/20"
           : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800"
       }`}
     >
-      <button
-        type="button"
-        onClick={() => hasFruits && setOpen((v) => !v)}
-        disabled={!hasFruits}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-zinc-50 disabled:cursor-default dark:hover:bg-zinc-700/40"
-      >
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="text-xs text-muted">{subtitle}</div>
+      <div className="px-3 py-2">
+        <div className="text-sm font-semibold">
+          {isReverse
+            ? "Reverse check — does candidate accept the apple?"
+            : formatStageTitle(stage)}
         </div>
-        {hasFruits && (
-          <span className="text-xs text-muted">{open ? "▾" : "▸"}</span>
-        )}
-      </button>
-      {open && hasFruits && (
-        <div className="border-t border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
-          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {ids.map((id) => {
+        <div className="text-xs text-muted">
+          {stage.passing_count} of {stage.input_count}{" "}
+          {isReverse ? "accepted" : "passing"}
+        </div>
+      </div>
+      {inputIds.length > 0 && (
+        <div className="border-t border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <div className="flex flex-wrap gap-2">
+            {inputIds.map((id) => {
               const fruit = fruitById.get(id);
               if (!fruit) return null;
-              return <FruitCard key={id} fruit={fruit} size="sm" />;
+              const passes = passingSet.has(id);
+              return (
+                <FruitChip
+                  key={id}
+                  fruit={fruit}
+                  dimmed={!passes}
+                  selected={selectedId === id}
+                  status={
+                    isReverse
+                      ? passes
+                        ? "accepted"
+                        : "rejected"
+                      : "neutral"
+                  }
+                  onClick={
+                    passes
+                      ? () =>
+                          setSelectedId(selectedId === id ? null : id)
+                      : undefined
+                  }
+                />
+              );
             })}
           </div>
+          {selected && (
+            <div className="mt-3">
+              <FruitCard fruit={selected} size="sm" />
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function Connector() {
-  return (
-    <div className="ml-5 h-4 border-l-2 border-dashed border-zinc-300 dark:border-zinc-700" />
-  );
-}
+// =============================================================================
+// Final result — full FruitCard(s)
+// =============================================================================
 
-function ResultBox({
-  selected,
+function ResultBlock({
+  trace,
   fruitById,
 }: {
-  selected: string | null;
+  trace: FilterTrace;
   fruitById: Map<string, Fruit>;
 }) {
-  const [open, setOpen] = useState(true);
-
-  if (selected) {
-    const fruit = fruitById.get(selected);
+  if (trace.selected) {
+    const selectedFruit = fruitById.get(trace.selected);
+    const otherFinalists = trace.final_candidates.filter(
+      (id) => id !== trace.selected,
+    );
     return (
-      <div className="overflow-hidden rounded-lg border-2 border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/20">
-        <button
-          type="button"
-          onClick={() => fruit && setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
-        >
-          <div className="min-w-0">
-            <div className="text-sm font-semibold">✓ Match found</div>
-            <div className="mt-0.5 text-xs text-muted">
-              Selected: <code>{selected}</code>
-            </div>
+      <div className="space-y-3 rounded-lg border-2 border-emerald-400 bg-emerald-50/30 p-3 dark:border-emerald-700 dark:bg-emerald-950/15">
+        <div>
+          <div className="text-sm font-semibold">✓ Match selected</div>
+          <div className="mt-0.5 text-xs text-muted">
+            FIFO winner from {trace.final_candidates.length} final candidate
+            {trace.final_candidates.length === 1 ? "" : "s"}
           </div>
-          {fruit && (
-            <span className="text-xs text-muted">{open ? "▾" : "▸"}</span>
-          )}
-        </button>
-        {open && fruit && (
-          <div className="border-t border-emerald-300 bg-emerald-50/40 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/10">
-            <FruitCard fruit={fruit} highlighted size="md" />
+        </div>
+        {selectedFruit && (
+          <FruitCard fruit={selectedFruit} size="md" highlighted />
+        )}
+        {otherFinalists.length > 0 && (
+          <div>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              Other finalists
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {otherFinalists.map((id) => {
+                const fruit = fruitById.get(id);
+                if (!fruit) return null;
+                return <FruitCard key={id} fruit={fruit} size="sm" />;
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -203,11 +335,39 @@ function ResultBox({
   );
 }
 
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function Connector() {
+  return (
+    <div className="ml-5 h-4 border-l-2 border-dashed border-zinc-300 dark:border-zinc-700" />
+  );
+}
+
+function FadeIn({
+  show,
+  children,
+}: {
+  show: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`transition-all duration-300 ${
+        show
+          ? "translate-y-0 opacity-100"
+          : "pointer-events-none -translate-y-1 opacity-0"
+      }`}
+      style={{ display: show ? undefined : "none" }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function formatStageTitle(stage: FilterStage): string {
   const { field, operation, criteria } = stage;
-  if (field === "reverse_compat") {
-    return "Reverse check — does candidate's prefs accept the apple?";
-  }
   if (operation === "range") {
     const r = criteria as { min?: number; max?: number };
     const min = r.min !== undefined ? r.min : "−∞";
@@ -218,4 +378,66 @@ function formatStageTitle(stage: FilterStage): string {
     return `${field} ∈ {${(criteria as string[]).join(", ")}}`;
   }
   return `${field} = ${String(criteria)}`;
+}
+
+// =============================================================================
+// Stats computation
+// =============================================================================
+
+interface PoolStats {
+  avgSize: string;
+  avgWeight: string;
+  shineBreakdown: { label: string; count: number }[];
+  hasWormFalse: number;
+  hasChemicalsFalse: number;
+}
+
+function computePoolStats(pool: Fruit[]): PoolStats {
+  const sizes = pool
+    .map((f) => f.attributes.size)
+    .filter((s): s is number => s !== null);
+  const weights = pool
+    .map((f) => f.attributes.weight)
+    .filter((w): w is number => w !== null);
+
+  const avgSize =
+    sizes.length > 0
+      ? (sizes.reduce((a, b) => a + b, 0) / sizes.length).toFixed(1)
+      : "—";
+  const avgWeight =
+    weights.length > 0
+      ? Math.round(weights.reduce((a, b) => a + b, 0) / weights.length).toString()
+      : "—";
+
+  const shineCounts: Record<ShineFactor, number> = {
+    dull: 0,
+    neutral: 0,
+    shiny: 0,
+    extraShiny: 0,
+  };
+  for (const f of pool) {
+    if (f.attributes.shineFactor) shineCounts[f.attributes.shineFactor]++;
+  }
+  const shineLabels: Record<ShineFactor, string> = {
+    dull: "dull",
+    neutral: "neutral",
+    shiny: "shiny",
+    extraShiny: "extra-shiny",
+  };
+  const shineBreakdown = (Object.keys(shineCounts) as ShineFactor[])
+    .filter((k) => shineCounts[k] > 0)
+    .map((k) => ({ label: shineLabels[k], count: shineCounts[k] }));
+
+  const hasWormFalse = pool.filter((f) => f.attributes.hasWorm === false).length;
+  const hasChemicalsFalse = pool.filter(
+    (f) => f.attributes.hasChemicals === false,
+  ).length;
+
+  return {
+    avgSize,
+    avgWeight,
+    shineBreakdown,
+    hasWormFalse,
+    hasChemicalsFalse,
+  };
 }

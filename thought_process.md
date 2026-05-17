@@ -50,3 +50,52 @@ To do:
 - Early termination ? 
 - do matching process for initial pool.
 - create admin dashboard
+
+
+
+Tying up things together; adding a new match table which will hold information about a match (could be in_progress or matched.). And have cascading updates if any of the fruits in the pool which belonged to other query; get updated. 
+
+
+ When a new fruit arrives (let's say orange):                                                                       
+  
+  1. INSERT fruit (is_matched = false)                                                                                         
+  2. QUERY candidate apples:                                                                                                 
+     SELECT * FROM fruit WHERE type = "apple" AND is_matched = false
+     ORDER BY (←in_progress_match_exists DESC), created_at ASC                                                                 
+     — in_progress apples first (FIFO), then seed/never-tried by age                                                           
+  3. RUN filter pipeline (existing matching.ts logic) → trace + passing IDs                                                    
+  4. IF any passing:                                                                                                           
+     a. winner = first passing apple (FIFO from sorted list)                                                                   
+     b. BEGIN TRANSACTION                                                                                                      
+          i.   Either UPDATE winner's in_progress match row OR INSERT new match row                                            
+               with progress="matched", matched_at=now(), both fruit links set,                                                
+               filter_trace = full trace from this evaluation                                                                  
+          ii.  UPDATE both fruits SET is_matched = true                                                                        
+          iii. CASCADE-CLEAN all other in_progress matches' filter_traces                                                    
+       COMMIT TRANSACTION                                                                                                      
+  5. ELSE:                                                                                                                   
+     INSERT match row {                                                                                                        
+       initiator: "orange",                                                                                                  
+       apple: null,                                                                                                            
+       orange: <new orange>,
+       progress: "in_progress",                                                                                                
+       filter_trace: full trace                                                                                              
+     }
+
+this is how we will cascade: 
+UPDATE match                                                                                                               
+  SET filter_trace.stages = filter_trace.stages.map(|$s| {
+    field: $s.field,                                                                                                           
+    operation: $s.operation,
+    criteria: $s.criteria,                                                                                                     
+    input_count: $s.input_count,                                                                                             
+    passing_count: $s.passing_ids.filter(|$id| $id NOT IN [$matched_apple, $matched_orange]).len(),                            
+    passing_ids: $s.passing_ids.filter(|$id| $id NOT IN [$matched_apple, $matched_orange])
+  }),                                                                                                                          
+  filter_trace.final_candidates = filter_trace.final_candidates.filter(|$id| $id NOT IN [$matched_apple, $matched_orange])   
+  WHERE progress = "in_progress"                                                                                               
+    AND id != $just_matched_row_id;                                                                                          
+ 
+
+
+ look into what will happen if cascade fails mid match

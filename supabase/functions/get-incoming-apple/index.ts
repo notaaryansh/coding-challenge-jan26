@@ -1,7 +1,7 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { generateApple, communicateAttributes, communicatePreferences } from "../_shared/generateFruit.ts";
-import { getDb } from "../_shared/db.ts";
+import { persistAndMatch } from "../_shared/match-persistence.ts";
 
 /**
  * Get Incoming Apple Edge Function
@@ -36,13 +36,8 @@ Deno.serve(async (req) => {
     const appleAttrs = communicateAttributes(apple);
     const applePrefs = communicatePreferences(apple);
 
-    // Step 3: Store the new apple in SurrealDB
-    const db = await getDb();
-    const [stored] = await db.create("fruit", { ...apple, source: "incoming" });
-    const appleId = String(stored.id);
-
-    // Step 4: Match the new apple to existing oranges
-    // TODO: Implement apple matching logic
+    // Step 3 + 4: Persist + match against unmatched oranges (FIFO with in_progress priority)
+    const result = await persistAndMatch(apple);
 
     // Step 5: Communicate matching results via LLM
     // TODO: Implement matching results communication logic
@@ -50,9 +45,15 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: "Apple received",
-        id: appleId,
+        id: result.fruit.id,
         attributes: appleAttrs,
         preferences: applePrefs,
+        match: {
+          id: result.match_id,
+          progress: result.progress,
+          partner_id: result.partner?.id ?? null,
+        },
+        trace: result.trace,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

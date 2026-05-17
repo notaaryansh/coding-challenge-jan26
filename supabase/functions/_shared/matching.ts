@@ -1,3 +1,6 @@
+// Deno-compatible mirror of frontend/lib/matching.ts.
+// Keep in sync manually; this is the price for not having a shared monorepo package yet.
+
 export type ShineFactor = "dull" | "neutral" | "shiny" | "extraShiny";
 
 export interface FruitAttributes {
@@ -32,40 +35,28 @@ export interface Fruit {
   preferences: FruitPreferences;
 }
 
-export type FilterOp = "equals" | "in" | "range";
+export type FilterOp = "equals" | "in" | "range" | "reverse";
 
-/** Apple-side preference filter, applied independently to the FULL pool. */
-export interface ParallelStage {
+export interface FilterStage {
   field: string;
   operation: FilterOp;
   criteria: unknown;
-  passing_ids: string[];
-}
-
-/** Reverse compatibility check — applied AFTER intersection. */
-export interface ReverseStage {
-  input_ids: string[];
+  input_count: number;
+  passing_count: number;
   passing_ids: string[];
 }
 
 export interface FilterTrace {
   initial_pool_size: number;
-  /** Each apple preference run independently against the whole pool. */
-  parallel_stages: ParallelStage[];
-  /** Fruits that passed every parallel stage (∩ of all passing_ids). */
-  intersection: string[];
-  /** Reverse compatibility check applied to the intersection. */
-  reverse: ReverseStage;
-  /** Same as reverse.passing_ids — final candidate set. */
+  stages: FilterStage[];
   final_candidates: string[];
-  /** FIFO winner from final_candidates, or null. */
   selected: string | null;
 }
 
 function attrMatches(
   attrs: FruitAttributes,
   field: string,
-  criteria: unknown
+  criteria: unknown,
 ): boolean {
   const value = attrs[field as keyof FruitAttributes];
   if (value === null) return false;
@@ -93,46 +84,45 @@ function operationFor(field: string, criteria: unknown): FilterOp {
 }
 
 export function runMatching(source: Fruit, pool: Fruit[]): FilterTrace {
-  // Step 1: independent filters — each preference evaluated against the FULL pool
-  const parallel_stages: ParallelStage[] = [];
+  const stages: FilterStage[] = [];
+  let candidates = pool;
+
   for (const [field, criteria] of Object.entries(source.preferences ?? {})) {
     if (criteria === undefined) continue;
-    const passing = pool.filter((c) =>
+    const inputCount = candidates.length;
+    const passing = candidates.filter((c) =>
       attrMatches(c.attributes, field, criteria)
     );
-    parallel_stages.push({
+    stages.push({
       field,
       operation: operationFor(field, criteria),
       criteria,
+      input_count: inputCount,
+      passing_count: passing.length,
       passing_ids: passing.map((c) => c.id),
     });
+    candidates = passing;
   }
 
-  // Step 2: intersect — fruits that passed every parallel stage
-  let intersection: Fruit[];
-  if (parallel_stages.length === 0) {
-    intersection = [...pool];
-  } else {
-    const passingSets = parallel_stages.map((s) => new Set(s.passing_ids));
-    intersection = pool.filter((c) => passingSets.every((set) => set.has(c.id)));
-  }
-
-  // Step 3: reverse check on the intersection
-  const reversePassing = intersection.filter((c) =>
+  const reverseInput = candidates.length;
+  const reverseCompat = candidates.filter((c) =>
     Object.entries(c.preferences ?? {}).every(([f, cr]) =>
       cr === undefined ? true : attrMatches(source.attributes, f, cr)
     )
   );
+  stages.push({
+    field: "reverse_compat",
+    operation: "reverse",
+    criteria: "candidate's preferences must accept the source",
+    input_count: reverseInput,
+    passing_count: reverseCompat.length,
+    passing_ids: reverseCompat.map((c) => c.id),
+  });
 
   return {
     initial_pool_size: pool.length,
-    parallel_stages,
-    intersection: intersection.map((c) => c.id),
-    reverse: {
-      input_ids: intersection.map((c) => c.id),
-      passing_ids: reversePassing.map((c) => c.id),
-    },
-    final_candidates: reversePassing.map((c) => c.id),
-    selected: reversePassing[0]?.id ?? null,
+    stages,
+    final_candidates: reverseCompat.map((c) => c.id),
+    selected: reverseCompat[0]?.id ?? null,
   };
 }

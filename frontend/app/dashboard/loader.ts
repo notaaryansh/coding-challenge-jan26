@@ -31,19 +31,33 @@ export interface DashboardData {
 export async function getDashboardData(): Promise<DashboardData> {
   const db = await getDb();
 
-  const [apples, oranges] = await db.query<
-    [Array<{ count: number }>, Array<{ count: number }>]
+  const [apples, oranges, matched, inProgress] = await db.query<
+    [
+      Array<{ count: number }>,
+      Array<{ count: number }>,
+      Array<{ count: number }>,
+      Array<{ count: number }>,
+    ]
   >(`
     SELECT count() FROM fruit WHERE type = "apple" GROUP ALL;
     SELECT count() FROM fruit WHERE type = "orange" GROUP ALL;
+    SELECT count() FROM match WHERE progress = "matched" GROUP ALL;
+    SELECT count() FROM match WHERE progress = "in_progress" GROUP ALL;
   `);
 
-  // TODO: Replace with actual SurrealDB or supabase queries
+  const matchedCount = matched[0]?.count ?? 0;
+  const inProgressCount = inProgress[0]?.count ?? 0;
+  const totalConversations = matchedCount + inProgressCount;
+  const successRate =
+    totalConversations > 0
+      ? Math.round((matchedCount / totalConversations) * 100)
+      : 0;
+
   const metrics: MatchMetrics = {
     totalApples: apples[0]?.count ?? 0,
     totalOranges: oranges[0]?.count ?? 0,
-    totalMatches: 0,
-    successRate: 0,
+    totalMatches: matchedCount,
+    successRate,
   };
 
   return { metrics };
