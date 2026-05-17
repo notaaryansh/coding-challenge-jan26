@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { FilterStage, FilterTrace, Fruit } from "@/lib/matching";
+import { FruitCard } from "@/components/fruit-card";
 
 interface TestResponse {
   source: Fruit;
@@ -65,7 +66,7 @@ export function TestMatchPanel() {
 
       {data && (
         <div className="space-y-2">
-          <SourceCard source={data.source} />
+          <FruitCard fruit={data.source} size="md" />
           <Connector />
           <StageBox
             title={`Initial pool: ${data.pool_size} ${data.pool_type}s`}
@@ -92,27 +93,6 @@ export function TestMatchPanel() {
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function SourceCard({ source }: { source: Fruit }) {
-  return (
-    <div className="rounded-lg border border-zinc-300 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="text-sm font-semibold">
-        🍎 Source apple{" "}
-        <code className="ml-1 text-xs font-normal text-muted">{source.id}</code>
-      </div>
-      <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
-        <div>
-          <div className="font-semibold text-muted">Attributes</div>
-          <KeyValueList obj={source.attributes} />
-        </div>
-        <div>
-          <div className="font-semibold text-muted">Preferences</div>
-          <KeyValueList obj={source.preferences} />
-        </div>
-      </div>
     </div>
   );
 }
@@ -161,61 +141,13 @@ function StageBox({
             {ids.map((id) => {
               const fruit = fruitById.get(id);
               if (!fruit) return null;
-              return <FruitCard key={id} fruit={fruit} />;
+              return <FruitCard key={id} fruit={fruit} size="sm" />;
             })}
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function FruitCard({ fruit }: { fruit: Fruit }) {
-  const icon = fruit.type === "apple" ? "🍎" : "🍊";
-  return (
-    <div className="rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-700 dark:bg-zinc-800">
-      <div className="font-semibold">
-        {icon} <code className="text-[11px] font-normal text-muted">{fruit.id}</code>
-      </div>
-      <div className="mt-1 grid grid-cols-1 gap-1 md:grid-cols-2">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-            attrs
-          </div>
-          <KeyValueList obj={fruit.attributes} />
-        </div>
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-            prefs
-          </div>
-          <KeyValueList obj={fruit.preferences} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KeyValueList({ obj }: { obj: Record<string, unknown> }) {
-  const entries = Object.entries(obj).filter(([, v]) => v !== undefined);
-  if (entries.length === 0) {
-    return <div className="text-[11px] italic text-muted">none</div>;
-  }
-  return (
-    <dl className="mt-0.5 space-y-0.5 text-[11px]">
-      {entries.map(([k, v]) => (
-        <div key={k} className="flex gap-1">
-          <dt className="font-mono text-muted">{k}:</dt>
-          <dd className="font-mono">{formatValue(v)}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function formatValue(v: unknown): string {
-  if (v === null) return "null";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
 }
 
 function Connector() {
@@ -254,7 +186,7 @@ function ResultBox({
         </button>
         {open && fruit && (
           <div className="border-t border-emerald-300 bg-emerald-50/40 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/10">
-            <FruitCard fruit={fruit} />
+            <FruitCard fruit={fruit} highlighted size="md" />
           </div>
         )}
       </div>
